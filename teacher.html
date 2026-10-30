@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>测量肺活量｜教师看板</title>
+<script src="mqtt.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f7fb; --card:#ffffff; --ink:#1f2a44; --sub:#6b7891;
+    --line:#e2e8f2; --brand:#2f6fed; --brand-d:#1f54c4;
+    --male:#2f6fed; --female:#ec5b8b; --ok:#1faa6b; --danger:#e0496b;
+    --shadow:0 8px 26px rgba(31,42,68,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 60px;}
+  header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--brand),#5b8bff);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:var(--shadow);}
+  h1{font-size:22px;margin:0;}
+  .sub{color:var(--sub);font-size:14px;margin:2px 0 0;}
+  .conn{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;background:#eef3ff;color:var(--brand-d);margin-left:auto;}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
+  .conn.local{background:#fff4e6;color:#b9760f;} .conn.local .dot{background:#e08a1e;}
+  .conn.off{background:#fdecec;color:#b42323;} .conn.off .dot{background:#e0496b;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0;}
+  .btn{cursor:pointer;border:none;border-radius:12px;padding:11px 18px;font-size:15px;font-weight:700;color:#fff;
+    background:var(--brand);box-shadow:var(--shadow);transition:.15s;white-space:nowrap;}
+  .btn:hover{background:var(--brand-d);} .btn:active{transform:translateY(1px);}
+  .btn.danger{background:var(--danger);} .btn.danger:hover{background:#c43a59;}
+  .btn.ghost{background:#fff;color:var(--brand-d);border:1px solid var(--line);}
+  .filterbadge{font-size:14px;background:#eaf1ff;color:var(--brand-d);border:1px solid #d6e2ff;border-radius:999px;padding:6px 14px;display:none;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .stat{background:#f6f9ff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:96px;}
+  .stat .n{font-size:20px;font-weight:800;} .stat .l{font-size:12px;color:var(--sub);}
+  .stat.m .n{color:var(--male);} .stat.f .n{color:var(--female);}
+  svg{width:100%;height:auto;display:block;}
+  .legend{display:flex;gap:18px;align-items:center;font-size:13px;color:var(--sub);margin-top:8px;flex-wrap:wrap;}
+  .lg{display:inline-flex;align-items:center;gap:6px;} .sw{width:12px;height:12px;border-radius:50%;display:inline-block;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line);}
+  th{font-size:13px;color:var(--sub);font-weight:600;}
+  tr.grouprow{cursor:pointer;transition:.12s;} tr.grouprow:hover{background:#f3f7ff;}
+  tr.grouprow.active{background:#e7f0ff;outline:2px solid var(--brand);}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;}
+  .pill.M{background:#eaf1ff;color:var(--male);} .pill.F{background:#fdeaf1;color:var(--female);}
+  .empty{text-align:center;color:var(--sub);padding:36px 0;font-size:15px;}
+  .foot{font-size:12px;color:var(--sub);margin-top:20px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">🫁</div>
+    <div>
+      <h1>测量肺活量｜教师看板</h1>
+      <div class="sub">班级肺活量点阵 · 纵轴为肺活量（毫升），点阵颜色表示性别，虚线表示男女生平均值</div>
+    </div>
+    <span class="conn" id="conn"><span class="dot"></span>连接中…</span>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn danger" id="clearBtn">清除数据（开始新的一节课）</button>
+    <span class="filterbadge" id="filterBadge"></span>
+    <button class="btn ghost" id="allBtn" style="display:none">显示全部小组</button>
+  </div>
+
+  <div class="card">
+    <h2>班级肺活量点阵 <span id="scopeTip" style="font-size:13px;color:var(--sub);font-weight:400"></span></h2>
+    <div class="stats" id="stats"></div>
+    <div id="chart"></div>
+    <div class="legend">
+      <span class="lg"><span class="sw" style="background:var(--male)"></span>男生</span>
+      <span class="lg"><span class="sw" style="background:var(--female)"></span>女生</span>
+      <span class="lg"><span class="sw" style="background:var(--male);opacity:.55"></span>男生平均（虚线）</span>
+      <span class="lg"><span class="sw" style="background:var(--female);opacity:.55"></span>女生平均（虚线）</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>各小组提交明细（点击某一行可只看该组）</h2>
+    <div id="table"></div>
+  </div>
+
+  <div class="foot">说明：学生用平板/手机打开本页提交，教师用电脑打开本页即可实时查看。<br>
+  每节课开始前点“清除数据”清空上一节课全部数据；点击下方任意小组行，可单独查看该组。</div>
+</div>
+
+<script>
+/* ===== 统一数据存储/同步层（与学生端一致） ===== */
+const Store = (function(){
+  const LS_KEY='feihuoliang_v1_state';
+  const MQTT_URL='wss://broker.emqx.io:8084/mqtt';
+  const ROOM=(new URLSearchParams(location.search).get('room')||'default').toString().slice(0,30).replace(/[^\w一-龥-]/g,'')||'default';
+  const STATE_T='feihuoliang/v1/'+ROOM+'/state';
+  let mode='init', client=null, state={submissions:[]};
+  let pending=[], flushed=false, online=false;
+  const stateCbs=[], modeCbs=[];
+  let bc=null; try{ bc=new BroadcastChannel('feihuoliang_v1'); }catch(e){}
+
+  function emitState(){ stateCbs.forEach(cb=>cb(state)); }
+  function emitMode(){ modeCbs.forEach(cb=>cb(mode,online)); }
+  function onState(cb){ stateCbs.push(cb); cb(state); }
+  function onMode(cb){ modeCbs.push(cb); }
+  function loadLS(){ try{const d=JSON.parse(localStorage.getItem(LS_KEY)); if(d&&d.submissions) return d;}catch(e){} return {submissions:[]}; }
+  function saveLS(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)); }
+  function publishMqtt(d){ state=d; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(d), {retain:true, qos:0}); emitState(); }
+  function flushPending(){ if(flushed) return; flushed=true; pending.forEach(sub=>state.submissions.push(sub)); pending=[]; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(state), {retain:true, qos:0}); emitState(); }
+  function addSubmission(sub){
+    if(mode==='local'){ const d=loadLS(); d.submissions.push(sub); saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
+    if(online && flushed){ const d={submissions:state.submissions.slice()}; d.submissions.push(sub); publishMqtt(d); }
+    else { pending.push(sub); }
+  }
+  function clearAll(){ pending=[]; if(mode==='local'){ const d={submissions:[]}; saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; } publishMqtt({submissions:[]}); }
+  function getState(){ return state; }
+  function init(){
+    if(typeof window.mqtt==='undefined'){ goLocal(); return; }
+    try{ client=mqtt.connect(MQTT_URL,{connectTimeout:4000,reconnectPeriod:2500,clean:true}); }
+    catch(e){ goLocal(); return; }
+    let connected=false;
+    const to=setTimeout(()=>{ if(!connected) goLocal(); }, 5000);
+    client.on('connect',()=>{ connected=true; online=true; clearTimeout(to); if(mode!=='mqtt'){mode='mqtt';emitMode();} client.subscribe(STATE_T,{qos:0},()=>{}); setTimeout(flushPending,700); });
+    client.on('message',(t,m)=>{ if(t===STATE_T){ try{const d=JSON.parse(m.toString()); if(d&&d.submissions){ state=d; emitState(); if(!flushed) flushPending(); }}catch(e){} } });
+    client.on('error',()=>{ if(!connected) goLocal(); });
+    client.on('close',()=>{ online=false; emitMode(); });
+    client.on('reconnect',()=>{ online=false; emitMode(); });
+  }
+  function goLocal(){ mode='local'; online=false; state=loadLS(); emitState(); emitMode();
+    window.addEventListener('storage',e=>{ if(e.key===LS_KEY){ const d=loadLS(); state=d; emitState(); } });
+    if(bc) bc.addEventListener('message',ev=>{ if(ev.data&&ev.data.type==='state'){ state=ev.data.d; emitState(); } });
+  }
+  return {init,onState,onMode,addSubmission,clearAll,getState};
+})();
+
+/* ===== 教师页面逻辑 ===== */
+(function(){
+  let selectedGroup=null;
+  const chartEl=document.getElementById('chart');
+  const tableEl=document.getElementById('table');
+  const statsEl=document.getElementById('stats');
+  const filterBadge=document.getElementById('filterBadge');
+  const allBtn=document.getElementById('allBtn');
+  const scopeTip=document.getElementById('scopeTip');
+
+  function flatten(subs){ const pts=[]; subs.forEach(s=>(s.members||[]).forEach(m=>pts.push({gender:m.gender,value:m.value,group:s.group,ts:s.ts}))); return pts; }
+  function niceMax(v){ if(v<=0) return 1000; const s=500; return Math.ceil(v/s)*s+s; }
+
+  function render(state){
+    let subs=(state.submissions||[]).slice();
+    if(selectedGroup) subs=subs.filter(s=>s.group===selectedGroup);
+    const pts=flatten(subs);
+    // 统计
+    const males=pts.filter(p=>p.gender==='M'), females=pts.filter(p=>p.gender==='F');
+    const mAvg=males.length?Math.round(males.reduce((a,b)=>a+b.value,0)/males.length):null;
+    const fAvg=females.length?Math.round(females.reduce((a,b)=>a+b.value,0)/females.length):null;
+    statsEl.innerHTML=`
+      <div class="stat"><div class="n">${pts.length}</div><div class="l">总人数</div></div>
+      <div class="stat m"><div class="n">${males.length}</div><div class="l">男生</div></div>
+      <div class="stat f"><div class="n">${females.length}</div><div class="l">女生</div></div>
+      <div class="stat m"><div class="n">${mAvg===null?'—':mAvg}</div><div class="l">男生平均(ml)</div></div>
+      <div class="stat f"><div class="n">${fAvg===null?'—':fAvg}</div><div class="l">女生平均(ml)</div></div>`;
+    chartEl.innerHTML = pts.length? buildSVG(pts,mAvg,fAvg) : '<div class="empty">暂无数据，等待学生提交…</div>';
+    // 表格（全部小组，选中高亮）
+    const allSubs=(state.submissions||[]);
+    if(allSubs.length===0){ tableEl.innerHTML='<div class="empty">暂无小组提交。</div>'; }
+    else{
+      let rows='';
+      allSubs.slice().reverse().forEach(sub=>{
+        const chips=(sub.members||[]).map(m=>`<span class="pill ${m.gender}">${m.gender==='M'?'男':'女'} ${m.value}</span>`).join(' ');
+        const active=(selectedGroup===sub.group)?' active':'';
+        rows+=`<tr class="grouprow${active}" data-group="${encodeURIComponent(sub.group)}"><td>${sub.group}</td><td>${new Date(sub.ts).toLocaleTimeString('zh-CN')}</td><td>${chips}</td></tr>`;
+      });
+      tableEl.innerHTML=`<table><thead><tr><th>小组</th><th>提交时间</th><th>组员（性别 肺活量ml）</th></tr></thead><tbody>${rows}</tbody></table>`;
+      [...tableEl.querySelectorAll('.grouprow')].forEach(tr=>{
+        tr.addEventListener('click',()=>{ const g=decodeURIComponent(tr.dataset.group); selectedGroup=(selectedGroup===g)?null:g; updateFilter(); render(Store.getState()); });
+      });
+    }
+    // 筛选提示
+    if(selectedGroup){ filterBadge.style.display='inline-block'; filterBadge.textContent='仅看：'+selectedGroup; allBtn.style.display='inline-block'; scopeTip.textContent='（当前仅显示「'+selectedGroup+'」）'; }
+    else { filterBadge.style.display='none'; allBtn.style.display='none'; scopeTip.textContent=''; }
+  }
+
+  function buildSVG(pts,mAvg,fAvg){
+    const W=720,H=420,L=60,R=24,T=24,B=46, pw=W-L-R, ph=H-T-B;
+    const maxV=niceMax(Math.max(...pts.map(p=>p.value))), n=pts.length;
+    const xAt=i=> n===1? L+pw/2 : L+(i+0.5)/n*pw;
+    const yAt=v=> T+ph*(1-v/maxV);
+    let yA=''; for(let i=0;i<=5;i++){ const v=Math.round(maxV*i/5), y=yAt(v); yA+=`<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="#eef1f7"/><text x="${L-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#6b7891">${v}</text>`; }
+    let av='';
+    if(mAvg!==null){ const y=yAt(mAvg); av+=`<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="var(--male)" stroke-width="1.5" stroke-dasharray="6 5" opacity=".6"/><text x="${W-R}" y="${y-6}" text-anchor="end" font-size="11" fill="var(--male)">男平均 ${mAvg}</text>`; }
+    if(fAvg!==null){ const y=yAt(fAvg); av+=`<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="var(--female)" stroke-width="1.5" stroke-dasharray="6 5" opacity=".6"/><text x="${W-R}" y="${y+14}" text-anchor="end" font-size="11" fill="var(--female)">女平均 ${fAvg}</text>`; }
+    let dots=''; pts.forEach((p,i)=>{ const cx=xAt(i),cy=yAt(p.value),c=p.gender==='M'?'var(--male)':'var(--female)';
+      dots+=`<circle cx="${cx}" cy="${cy}" r="7" fill="${c}" fill-opacity=".85" stroke="#fff" stroke-width="2"/><text x="${cx}" y="${cy-12}" text-anchor="middle" font-size="10" fill="#6b7891">${p.value}</text>`; });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="肺活量点阵图">
+      <line x1="${L}" y1="${T}" x2="${L}" y2="${T+ph}" stroke="#c9d3e3" stroke-width="1.5"/><line x1="${L}" y1="${T+ph}" x2="${W-R}" y2="${T+ph}" stroke="#c9d3e3" stroke-width="1.5"/>
+      ${yA}${av}${dots}
+      <text x="${L}" y="${H-12}" font-size="12" fill="#6b7891">每位学生一个点（按提交顺序从左到右）</text>
+      <text x="${L-44}" y="${T+ph/2}" font-size="12" fill="#6b7891" transform="rotate(-90 ${L-44} ${T+ph/2})" text-anchor="middle">肺活量（毫升）</text></svg>`;
+  }
+
+  function updateFilter(){ /* 由 render 内部处理显示 */ }
+
+  document.getElementById('clearBtn').addEventListener('click',function(){
+    const cnt=(Store.getState().submissions||[]).length;
+    if(cnt===0){ alert('当前没有数据，无需清除。'); return; }
+    if(!confirm(`确定清除全部数据吗？\n将清空 ${cnt} 个小组、上一节课的全部学生数据，开始新的一节课。此操作不可恢复。`)) return;
+    selectedGroup=null; Store.clearAll(); render(Store.getState());
+  });
+  allBtn.addEventListener('click',function(){ selectedGroup=null; render(Store.getState()); });
+
+  Store.onState(function(s){ render(s); });
+  Store.onMode(function(m,on){
+    const el=document.getElementById('conn');
+    if(m==='local'){ el.className='conn local'; el.innerHTML='<span class="dot"></span>本机模式（需联网跨设备）'; }
+    else if(on){ el.className='conn'; el.innerHTML='<span class="dot"></span>实时已连接'; }
+    else { el.className='conn off'; el.innerHTML='<span class="dot"></span>连接中…'; }
+  });
+  Store.init();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>测量肺活量｜学生填写页</title>
+<script src="mqtt.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f7fb; --card:#ffffff; --ink:#1f2a44; --sub:#6b7891;
+    --line:#e2e8f2; --brand:#2f6fed; --brand-d:#1f54c4;
+    --male:#2f6fed; --female:#ec5b8b; --ok:#1faa6b;
+    --shadow:0 8px 26px rgba(31,42,68,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 16px 60px;}
+  header.top{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+  .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--brand),#5b8bff);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:var(--shadow);}
+  h1{font-size:22px;margin:0;}
+  .sub{color:var(--sub);font-size:14px;margin:2px 0 16px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .card h2{font-size:16px;margin:0 0 12px;}
+  .hint{font-size:13px;color:var(--sub);}
+  .conn{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;background:#eef3ff;color:var(--brand-d);}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
+  .conn.local{background:#fff4e6;color:#b9760f;}
+  .conn.off{background:#fdecec;color:#b42323;}
+  .field{margin-bottom:12px;}
+  label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px;}
+  input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;background:#fbfcfe;color:var(--ink);}
+  input:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(47,111,237,.12);}
+  table{width:100%;border-collapse:collapse;}
+  th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line);}
+  th{font-size:13px;color:var(--sub);font-weight:600;}
+  .member-gender{width:120px;} .member-val{width:160px;}
+  .rowidx{font-weight:700;color:var(--brand);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;border:none;
+    border-radius:12px;padding:13px 22px;font-size:16px;font-weight:700;color:#fff;background:var(--brand);
+    box-shadow:var(--shadow);transition:.15s;width:100%;}
+  .btn:hover{background:var(--brand-d);} .btn:active{transform:translateY(1px);}
+  .status{margin-top:14px;font-size:14px;padding:12px 14px;border-radius:10px;display:none;}
+  .status.ok{display:block;background:#e9f8f0;color:#157a4d;border:1px solid #bfe9d2;}
+  .status.err{display:block;background:#fdecec;color:#b42323;border:1px solid #f4c4c4;}
+  .chip{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;margin:3px 4px 0 0;}
+  .foot{font-size:12px;color:var(--sub);margin-top:20px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">🫁</div>
+    <div style="flex:1">
+      <h1>测量肺活量｜学生填写页</h1>
+      <div class="sub">本组在平板上填写，教师电脑看板实时接收</div>
+    </div>
+    <span class="conn" id="conn"><span class="dot"></span>连接中…</span>
+  </header>
+
+  <div class="card">
+    <h2>① 小组信息</h2>
+    <div class="field">
+      <label>小组名称（教师端据此区分各小组）</label>
+      <input id="groupName" maxlength="20" placeholder="例如 第3组 / 雄鹰队">
+    </div>
+    <p class="hint">无需输入任何课堂码，打开即可提交；教师在电脑上会按“小组名称”分别显示，并可单独点开查看某一组。</p>
+  </div>
+
+  <div class="card">
+    <h2>② 登记组员（最多 6 人）</h2>
+    <p class="hint" style="margin-top:-6px">可只登记已完成测量的组员。每位组员需选择性别并填写非负整数肺活量（毫升）。</p>
+    <table>
+      <thead><tr><th style="width:56px">#</th><th class="member-gender">性别</th><th class="member-val">最大肺活量（毫升）</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <button class="btn" id="submitBtn">提交本组数据</button>
+  <div class="status" id="status"></div>
+
+  <div class="card" id="submittedCard" style="display:none;margin-top:16px">
+    <h2>✅ 已提交记录</h2>
+    <div id="submittedList"></div>
+  </div>
+
+  <div class="foot">需要联网（通过公共实时服务中转）才能跨设备同步；若离线，将自动切换到本机模式（仅同一浏览器内可见）。</div>
+</div>
+
+<script>
+/* ===== 统一数据存储/同步层：MQTT(跨设备) + 本地回退 ===== */
+const Store = (function(){
+  const LS_KEY='feihuoliang_v1_state';
+  const MQTT_URL='wss://broker.emqx.io:8084/mqtt';
+  const ROOM=(new URLSearchParams(location.search).get('room')||'default').toString().slice(0,30).replace(/[^\w一-龥-]/g,'')||'default';
+  const STATE_T='feihuoliang/v1/'+ROOM+'/state';
+  let mode='init', client=null, state={submissions:[]};
+  let pending=[], flushed=false, online=false;
+  const stateCbs=[], modeCbs=[];
+  let bc=null; try{ bc=new BroadcastChannel('feihuoliang_v1'); }catch(e){}
+
+  function emitState(){ stateCbs.forEach(cb=>cb(state)); }
+  function emitMode(){ modeCbs.forEach(cb=>cb(mode,online)); }
+  function onState(cb){ stateCbs.push(cb); cb(state); }
+  function onMode(cb){ modeCbs.push(cb); }
+
+  function loadLS(){ try{const d=JSON.parse(localStorage.getItem(LS_KEY)); if(d&&d.submissions) return d;}catch(e){} return {submissions:[]}; }
+  function saveLS(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)); }
+
+  function publishMqtt(d){ state=d; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(d), {retain:true, qos:0}); emitState(); }
+
+  function flushPending(){
+    if(flushed) return; flushed=true;
+    pending.forEach(sub=>state.submissions.push(sub));
+    pending=[];
+    if(client&&client.connected){ client.publish(STATE_T, JSON.stringify(state), {retain:true, qos:0}); }
+    emitState();
+  }
+
+  function addSubmission(sub){
+    if(mode==='local'){ const d=loadLS(); d.submissions.push(sub); saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
+    if(online && flushed){ const d={submissions:state.submissions.slice()}; d.submissions.push(sub); publishMqtt(d); }
+    else { pending.push(sub); }   // 仍在连接中，入队，连上后合并
+  }
+  function clearAll(){
+    pending=[];
+    if(mode==='local'){ const d={submissions:[]}; saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
+    publishMqtt({submissions:[]});
+  }
+  function getState(){ return state; }
+
+  function init(){
+    if(typeof window.mqtt==='undefined'){ goLocal(); return; }
+    try{ client=mqtt.connect(MQTT_URL,{connectTimeout:4000,reconnectPeriod:2500,clean:true}); }
+    catch(e){ goLocal(); return; }
+    let connected=false;
+    const to=setTimeout(()=>{ if(!connected){ goLocal(); } }, 5000);
+    client.on('connect',()=>{
+      connected=true; online=true; clearTimeout(to);
+      if(mode!=='mqtt'){ mode='mqtt'; emitMode(); }
+      client.subscribe(STATE_T,{qos:0},()=>{});
+      setTimeout(flushPending, 700); // 兜底：若无保留消息也照常提交排队数据
+    });
+    client.on('message',(t,m)=>{
+      if(t===STATE_T){ try{const d=JSON.parse(m.toString()); if(d&&d.submissions){ state=d; emitState(); if(!flushed) flushPending(); }}catch(e){} }
+    });
+    client.on('error',()=>{ if(!connected) goLocal(); });
+    client.on('close',()=>{ online=false; emitMode(); });
+    client.on('reconnect',()=>{ online=false; emitMode(); });
+  }
+  function goLocal(){
+    mode='local'; online=false; state=loadLS(); emitState(); emitMode();
+    window.addEventListener('storage',e=>{ if(e.key===LS_KEY){ const d=loadLS(); state=d; emitState(); } });
+    if(bc) bc.addEventListener('message',ev=>{ if(ev.data&&ev.data.type==='state'){ state=ev.data.d; emitState(); } });
+  }
+  return {init,onState,onMode,addSubmission,clearAll,getState};
+})();
+
+/* ===== 学生页面逻辑 ===== */
+(function(){
+  const rowsEl=document.getElementById('rows'); const N=6;
+  for(let i=0;i<N;i++){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="rowidx">${i+1}</td>
+      <td class="member-gender"><select data-i="${i}" class="gender"><option value="">请选择</option><option value="M">男生</option><option value="F">女生</option></select></td>
+      <td class="member-val"><input type="number" min="0" max="9999" step="1" data-i="${i}" class="value" placeholder="如 3200"></td>`;
+    rowsEl.appendChild(tr);
+  }
+
+  function show(msg,type){ const s=document.getElementById('status'); s.textContent=msg; s.className='status '+type; }
+
+  document.getElementById('submitBtn').addEventListener('click',function(){
+    const group=(document.getElementById('groupName').value||'').trim();
+    if(!group){ show('请填写小组名称（教师端据此区分各小组）。','err'); return; }
+    const genders=[...document.querySelectorAll('.gender')];
+    const values=[...document.querySelectorAll('.value')];
+    const members=[]; let err='';
+    for(let i=0;i<N;i++){
+      const g=genders[i].value, raw=values[i].value.trim();
+      if(g&&raw===''){ err=`第 ${i+1} 位组员已选性别但未填肺活量。`; break; }
+      if(!g&&raw!==''){ err=`第 ${i+1} 位组员已填肺活量但未选性别。`; break; }
+      if(g&&raw!==''){ const v=Number(raw);
+        if(!Number.isInteger(v)||v<0){ err=`第 ${i+1} 位组员肺活量须为非负整数。`; break; }
+        if(v>9999){ err=`第 ${i+1} 位组员肺活量数值过大，请检查。`; break; }
+        members.push({gender:g,value:v});
+      }
+    }
+    if(err){ show(err,'err'); return; }
+    if(members.length===0){ show('请至少完整登记 1 位组员（性别 + 肺活量）。','err'); return; }
+
+    const sub={id:Date.now()+'_'+Math.random().toString(36).slice(2,7),group,members,ts:Date.now()};
+    Store.addSubmission(sub);
+    show(`提交成功！本组 ${members.length} 名组员数据已实时发送到教师端。`,'ok');
+    renderSubmitted(sub);
+  });
+
+  function renderSubmitted(sub){
+    document.getElementById('submittedCard').style.display='block';
+    const list=document.getElementById('submittedList');
+    const chips=sub.members.map(m=>{
+      const c=m.gender==='M'?'var(--male)':'var(--female)'; const t=m.gender==='M'?'男':'女';
+      return `<span class="chip" style="color:${c};background:${c}1a">${t} ${m.value} ml</span>`;
+    }).join('');
+    const div=document.createElement('div'); div.style.marginTop='8px';
+    div.innerHTML=`<strong>${sub.group}</strong> · ${new Date(sub.ts).toLocaleTimeString('zh-CN')}<br>${chips}`;
+    list.prepend(div);
+  }
+
+  // 连接状态显示
+  Store.onMode(function(m,on){
+    const el=document.getElementById('conn');
+    if(m==='local'){ el.className='conn local'; el.innerHTML='<span class="dot" style="background:#e08a1e"></span>本机模式（需联网跨设备）'; }
+    else if(on){ el.className='conn'; el.innerHTML='<span class="dot"></span>实时已连接'; }
+    else { el.className='conn off'; el.innerHTML='<span class="dot" style="background:#e0496b"></span>连接中…'; }
+  });
+  Store.init();
+})();
+</script>
+</body>
+</html>

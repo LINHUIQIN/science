@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>测量肺活量课堂 · 入口</title>
+<style>
+  :root{--bg:#f4f7fb;--card:#fff;--ink:#1f2a44;--sub:#6b7891;--line:#e2e8f2;--brand:#2f6fed;--brand-d:#1f54c4;--shadow:0 8px 26px rgba(31,42,68,.08);}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);}
+  .wrap{max-width:560px;margin:0 auto;padding:40px 20px 60px;}
+  .logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--brand),#5b8bff);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:var(--shadow);margin-bottom:14px;}
+  h1{font-size:24px;margin:0 0 6px;}
+  .sub{color:var(--sub);font-size:15px;margin-bottom:28px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:var(--shadow);margin-bottom:16px;text-decoration:none;display:block;transition:.15s;}
+  .card:hover{transform:translateY(-2px);border-color:#cdd9f2;}
+  .card .t{font-size:19px;font-weight:800;display:flex;align-items:center;gap:10px;}
+  .card .d{color:var(--sub);font-size:14px;margin-top:8px;line-height:1.5;}
+  .teach .t{color:var(--brand-d);} .stu .t{color:#e0496b;}
+  .emoji{font-size:24px;}
+  .hint{margin-top:30px;font-size:13px;color:var(--sub);line-height:1.6;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">🫁</div>
+  <h1>测量肺活量课堂</h1>
+  <div class="sub">请按身份进入对应页面</div>
+
+  <a class="card teach" href="teacher.html">
+    <div class="t"><span class="emoji">🧑‍🏫</span>我是老师（看板 / 清除数据）</div>
+    <div class="d">用电脑打开。实时接收全班平板提交的数据，点某小组可单独查看，每节课前点“清除数据”清空上一节课。</div>
+  </a>
+
+  <a class="card stu" href="student.html">
+    <div class="t"><span class="emoji">📱</span>我是学生（填写提交）</div>
+    <div class="d">用平板或手机打开。填写本组名称、组员性别与肺活量后提交，老师端会实时显示。</div>
+  </a>
+
+  <div class="hint">两个页面打开同一个网址即可自动实时联动，无需任何配置。<br>需联网（通过公共实时服务中转）才能跨设备同步。</div>
+</div>
+</body>
+</html>

@@ -41,6 +41,7 @@
     border-radius:12px;padding:13px 22px;font-size:16px;font-weight:700;color:#fff;background:var(--brand);
     box-shadow:var(--shadow);transition:.15s;width:100%;}
   .btn:hover{background:var(--brand-d);} .btn:active{transform:translateY(1px);}
+  .btn:disabled,.btn.done{cursor:not-allowed;opacity:.65;background:#9fb4d8;box-shadow:none;}
   .status{margin-top:14px;font-size:14px;padding:12px 14px;border-radius:10px;display:none;}
   .status.ok{display:block;background:#e9f8f0;color:#157a4d;border:1px solid #bfe9d2;}
   .status.err{display:block;background:#fdecec;color:#b42323;border:1px solid #f4c4c4;}
@@ -125,16 +126,16 @@ const Store = (function(){
 
   function flushPending(){
     if(flushed) return; flushed=true;
-    pending.forEach(sub=>state.submissions.push(sub));
-    pending=[];
+    const map={}; (state.submissions||[]).forEach(s=>map[s.group]=s); pending.forEach(sub=>map[sub.group]=sub);
+    state.submissions=Object.values(map); pending=[];
     if(client&&client.connected){ client.publish(STATE_T, JSON.stringify(state), {retain:true, qos:0}); }
     emitState();
   }
 
   function addSubmission(sub){
-    if(mode==='local'){ const d=loadLS(); d.submissions.push(sub); saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
-    if(online && flushed){ const d={submissions:state.submissions.slice()}; d.submissions.push(sub); publishMqtt(d); }
-    else { pending.push(sub); }   // 仍在连接中，入队，连上后合并
+    if(mode==='local'){ const d=loadLS(); const i=d.submissions.findIndex(s=>s.group===sub.group); if(i>=0)d.submissions[i]=sub; else d.submissions.push(sub); saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
+    if(online && flushed){ const d={submissions:state.submissions.slice()}; const i=d.submissions.findIndex(s=>s.group===sub.group); if(i>=0)d.submissions[i]=sub; else d.submissions.push(sub); publishMqtt(d); }
+    else { pending.push(sub); }   // 仍在连接中，入队，连上后合并（flush 时按组去重）
   }
   function clearAll(){
     pending=[];
@@ -167,7 +168,12 @@ const Store = (function(){
     window.addEventListener('storage',e=>{ if(e.key===LS_KEY){ const d=loadLS(); state=d; emitState(); } });
     if(bc) bc.addEventListener('message',ev=>{ if(ev.data&&ev.data.type==='state'){ state=ev.data.d; emitState(); } });
   }
-  return {init,onState,onMode,addSubmission,clearAll,getState};
+  function removeSubmission(id){
+    state.submissions=state.submissions.filter(s=>s.id!==id);
+    if(mode==='local'){ saveLS(state); if(bc) bc.postMessage({type:'state',d:state}); emitState(); return; }
+    publishMqtt(state);
+  }
+  return {init,onState,onMode,addSubmission,clearAll,removeSubmission,getState};
 })();
 
 /* ===== 学生页面逻辑 ===== */
@@ -181,11 +187,35 @@ const Store = (function(){
     rowsEl.appendChild(tr);
   }
 
+  const groupSel=document.getElementById('groupName');
+  let currentGroup=groupSel.value;
+  const submitBtn=document.getElementById('submitBtn');
+  const submittedCard=document.getElementById('submittedCard');
+  const submittedList=document.getElementById('submittedList');
+
   function show(msg,type){ const s=document.getElementById('status'); s.textContent=msg; s.className='status '+type; }
 
-  document.getElementById('submitBtn').addEventListener('click',function(){
-    const group=(document.getElementById('groupName').value||'').trim();
-    if(!group){ show('请选择本小组的编号。','err'); return; }
+  // 根据该组是否已存在于共享数据中，切换“可提交 / 已提交”状态
+  function refreshSubmitState(){
+    const sub=(Store.getState().submissions||[]).find(s=>s.group===currentGroup);
+    if(sub){
+      submitBtn.disabled=true; submitBtn.textContent='该小组已提交 ✓';
+      const chips=sub.members.map(m=>{
+        const c=m.gender==='M'?'var(--male)':'var(--female)'; const t=m.gender==='M'?'男':'女';
+        return `<span class="chip" style="color:${c};background:${c}1a">${t} ${m.value} ml</span>`;
+      }).join('');
+      submittedCard.style.display='block';
+      submittedList.innerHTML=`<strong>${sub.group}</strong> · ${new Date(sub.ts).toLocaleTimeString('zh-CN')}<br>${chips}
+        <div style="margin-top:8px;color:var(--sub);font-size:13px">如需修改，请联系教师删除该记录后在此重新提交。</div>`;
+    } else {
+      submitBtn.disabled=false; submitBtn.textContent='提交本组数据';
+      submittedCard.style.display='none';
+    }
+  }
+
+  submitBtn.addEventListener('click',function(){
+    if(submitBtn.disabled) return;
+    const group=currentGroup;
     const genders=[...document.querySelectorAll('.gender')];
     const values=[...document.querySelectorAll('.value')];
     const members=[]; let err='';
@@ -201,26 +231,19 @@ const Store = (function(){
     }
     if(err){ show(err,'err'); return; }
     if(members.length===0){ show('请至少完整登记 1 位组员（性别 + 肺活量）。','err'); return; }
+    if((Store.getState().submissions||[]).some(s=>s.group===group)){ show('该小组已提交过，不能再重复提交；如需修改，请联系教师删除后重提。','err'); return; }
 
     const sub={id:Date.now()+'_'+Math.random().toString(36).slice(2,7),group,members,ts:Date.now()};
     Store.addSubmission(sub);
     show(`提交成功！本组 ${members.length} 名组员数据已实时发送到教师端。`,'ok');
-    renderSubmitted(sub);
+    refreshSubmitState();
   });
 
-  function renderSubmitted(sub){
-    document.getElementById('submittedCard').style.display='block';
-    const list=document.getElementById('submittedList');
-    const chips=sub.members.map(m=>{
-      const c=m.gender==='M'?'var(--male)':'var(--female)'; const t=m.gender==='M'?'男':'女';
-      return `<span class="chip" style="color:${c};background:${c}1a">${t} ${m.value} ml</span>`;
-    }).join('');
-    const div=document.createElement('div'); div.style.marginTop='8px';
-    div.innerHTML=`<strong>${sub.group}</strong> · ${new Date(sub.ts).toLocaleTimeString('zh-CN')}<br>${chips}`;
-    list.prepend(div);
-  }
+  groupSel.addEventListener('change',function(){ currentGroup=this.value; refreshSubmitState(); });
 
-  // 连接状态显示
+  // 共享数据变化时（含教师删除本组），自动刷新提交状态
+  Store.onState(function(){ refreshSubmitState(); });
+
   Store.onMode(function(m,on){
     const el=document.getElementById('conn');
     if(m==='local'){ el.className='conn local'; el.innerHTML='<span class="dot" style="background:#e08a1e"></span>本机模式（需联网跨设备）'; }
@@ -228,6 +251,7 @@ const Store = (function(){
     else { el.className='conn off'; el.innerHTML='<span class="dot" style="background:#e0496b"></span>连接中…'; }
   });
   Store.init();
+  refreshSubmitState();
 })();
 </script>
 </body>

@@ -62,10 +62,23 @@
   <div class="card">
     <h2>① 小组信息</h2>
     <div class="field">
-      <label>小组名称（教师端据此区分各小组）</label>
-      <input id="groupName" maxlength="20" placeholder="例如 第3组 / 雄鹰队">
+      <label>选择小组（第 1 组 ~ 第 12 组）</label>
+      <select id="groupName">
+        <option value="第1组">第1组</option>
+        <option value="第2组">第2组</option>
+        <option value="第3组">第3组</option>
+        <option value="第4组">第4组</option>
+        <option value="第5组">第5组</option>
+        <option value="第6组">第6组</option>
+        <option value="第7组">第7组</option>
+        <option value="第8组">第8组</option>
+        <option value="第9组">第9组</option>
+        <option value="第10组">第10组</option>
+        <option value="第11组">第11组</option>
+        <option value="第12组">第12组</option>
+      </select>
     </div>
-    <p class="hint">无需输入任何课堂码，打开即可提交；教师在电脑上会按“小组名称”分别显示，并可单独点开查看某一组。</p>
+    <p class="hint">无需输入任何课堂码，打开即选本小组编号并填写组员数据；教师在电脑上会按“小组”分别显示，并可单独点开查看某一组。</p>
   </div>
 
   <div class="card">
@@ -172,7 +185,7 @@ const Store = (function(){
 
   document.getElementById('submitBtn').addEventListener('click',function(){
     const group=(document.getElementById('groupName').value||'').trim();
-    if(!group){ show('请填写小组名称（教师端据此区分各小组）。','err'); return; }
+    if(!group){ show('请选择本小组的编号。','err'); return; }
     const genders=[...document.querySelectorAll('.gender')];
     const values=[...document.querySelectorAll('.value')];
     const members=[]; let err='';

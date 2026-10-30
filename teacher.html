@@ -31,6 +31,7 @@
   .btn:hover{background:var(--brand-d);} .btn:active{transform:translateY(1px);}
   .btn.danger{background:var(--danger);} .btn.danger:hover{background:#c43a59;}
   .btn.ghost{background:#fff;color:var(--brand-d);border:1px solid var(--line);}
+  .btn.ghost.del{padding:6px 12px;font-size:13px;color:var(--danger);border-color:#f4c4c4;} .btn.ghost.del:hover{background:#fdecec;}
   .filterbadge{font-size:14px;background:#eaf1ff;color:var(--brand-d);border:1px solid #d6e2ff;border-radius:999px;padding:6px 14px;display:none;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px;}
   .card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
@@ -109,10 +110,10 @@ const Store = (function(){
   function loadLS(){ try{const d=JSON.parse(localStorage.getItem(LS_KEY)); if(d&&d.submissions) return d;}catch(e){} return {submissions:[]}; }
   function saveLS(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)); }
   function publishMqtt(d){ state=d; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(d), {retain:true, qos:0}); emitState(); }
-  function flushPending(){ if(flushed) return; flushed=true; pending.forEach(sub=>state.submissions.push(sub)); pending=[]; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(state), {retain:true, qos:0}); emitState(); }
+  function flushPending(){ if(flushed) return; flushed=true; const map={}; (state.submissions||[]).forEach(s=>map[s.group]=s); pending.forEach(sub=>map[sub.group]=sub); state.submissions=Object.values(map); pending=[]; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(state), {retain:true, qos:0}); emitState(); }
   function addSubmission(sub){
-    if(mode==='local'){ const d=loadLS(); d.submissions.push(sub); saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
-    if(online && flushed){ const d={submissions:state.submissions.slice()}; d.submissions.push(sub); publishMqtt(d); }
+    if(mode==='local'){ const d=loadLS(); const i=d.submissions.findIndex(s=>s.group===sub.group); if(i>=0)d.submissions[i]=sub; else d.submissions.push(sub); saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
+    if(online && flushed){ const d={submissions:state.submissions.slice()}; const i=d.submissions.findIndex(s=>s.group===sub.group); if(i>=0)d.submissions[i]=sub; else d.submissions.push(sub); publishMqtt(d); }
     else { pending.push(sub); }
   }
   function clearAll(){ pending=[]; if(mode==='local'){ const d={submissions:[]}; saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; } publishMqtt({submissions:[]}); }
@@ -133,7 +134,12 @@ const Store = (function(){
     window.addEventListener('storage',e=>{ if(e.key===LS_KEY){ const d=loadLS(); state=d; emitState(); } });
     if(bc) bc.addEventListener('message',ev=>{ if(ev.data&&ev.data.type==='state'){ state=ev.data.d; emitState(); } });
   }
-  return {init,onState,onMode,addSubmission,clearAll,getState};
+  function removeSubmission(id){
+    state.submissions=state.submissions.filter(s=>s.id!==id);
+    if(mode==='local'){ saveLS(state); if(bc) bc.postMessage({type:'state',d:state}); emitState(); return; }
+    publishMqtt(state);
+  }
+  return {init,onState,onMode,addSubmission,clearAll,removeSubmission,getState};
 })();
 
 /* ===== 教师页面逻辑 ===== */
@@ -172,11 +178,19 @@ const Store = (function(){
       allSubs.slice().reverse().forEach(sub=>{
         const chips=(sub.members||[]).map(m=>`<span class="pill ${m.gender}">${m.gender==='M'?'男':'女'} ${m.value}</span>`).join(' ');
         const active=(selectedGroup===sub.group)?' active':'';
-        rows+=`<tr class="grouprow${active}" data-group="${encodeURIComponent(sub.group)}"><td>${sub.group}</td><td>${new Date(sub.ts).toLocaleTimeString('zh-CN')}</td><td>${chips}</td></tr>`;
+        rows+=`<tr class="grouprow${active}" data-group="${encodeURIComponent(sub.group)}"><td>${sub.group}</td><td>${new Date(sub.ts).toLocaleTimeString('zh-CN')}</td><td>${chips}</td><td><button class="btn ghost del" data-id="${sub.id}">删除</button></td></tr>`;
       });
-      tableEl.innerHTML=`<table><thead><tr><th>小组</th><th>提交时间</th><th>组员（性别 肺活量ml）</th></tr></thead><tbody>${rows}</tbody></table>`;
+      tableEl.innerHTML=`<table><thead><tr><th>小组</th><th>提交时间</th><th>组员（性别 肺活量ml）</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table>`;
       [...tableEl.querySelectorAll('.grouprow')].forEach(tr=>{
         tr.addEventListener('click',()=>{ const g=decodeURIComponent(tr.dataset.group); selectedGroup=(selectedGroup===g)?null:g; updateFilter(); render(Store.getState()); });
+      });
+      [...tableEl.querySelectorAll('.del')].forEach(btn=>{
+        btn.addEventListener('click',function(e){
+          e.stopPropagation();
+          const id=this.dataset.id;
+          if(!confirm('确定删除该小组的提交记录吗？\n删除后该小组可在学生端重新提交。')) return;
+          Store.removeSubmission(id); render(Store.getState());
+        });
       });
     }
     // 筛选提示

@@ -1,752 +1,240 @@
 <!DOCTYPE html>
-<!-- saved from url=(0095)file:///C:/Users/LYXX-LHQ/WorkBuddy/2026-10-30-18-14-39/publish/science-repo/teacher/index.html -->
-<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>教师工作台</title>
+<title>测量肺活量｜教师看板</title>
+<script src="mqtt.min.js"></script>
 <style>
   :root{
-    --accent:#e05038;
-    --accent-deep:#c2532e;
-    --accent-soft:#fdece3;
-    --accent-softer:#fdf3ed;
-    --today-bg:#fdf0e7;
-    --today-head:#f8d8c4;
-    --page-bg:#f6f6f4;
-    --card:#ffffff;
-    --border:#eee5df;
-    --text:#3a3a3a;
-    --text-sub:#8a8a86;
-    --radius:14px;
+    --bg:#f4f7fb; --card:#ffffff; --ink:#1f2a44; --sub:#6b7891;
+    --line:#e2e8f2; --brand:#2f6fed; --brand-d:#1f54c4;
+    --male:#2f6fed; --female:#ec5b8b; --ok:#1faa6b; --danger:#e0496b;
+    --shadow:0 8px 26px rgba(31,42,68,.08);
   }
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{
-    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
-    background:var(--page-bg);
-    color:var(--text);
-    font-size:14px;
-    height:100vh;
-    display:flex;
-    overflow:hidden;
-  }
-  /* ============ 侧边栏 ============ */
-  .sidebar{
-    width:170px;min-width:170px;
-    background:#fff;
-    border-right:1px solid var(--border);
-    display:flex;flex-direction:column;
-    padding:16px 10px 12px;
-  }
-  .brand{
-    display:flex;align-items:center;gap:7px;
-    padding:4px 8px 18px;
-    font-weight:600;font-size:14.5px;
-  }
-  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
-  .nav{flex:1;display:flex;flex-direction:column;gap:2px;}
-  .nav-item{
-    display:flex;align-items:center;gap:8px;
-    padding:8px 10px;border-radius:9px;
-    cursor:pointer;color:#555;
-    transition:background .15s;
-    white-space:nowrap;font-size:13.5px;
-  }
-  .nav-item:hover{background:var(--accent-softer);}
-  .nav-item.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:600;}
-  .nav-item .ico{width:18px;text-align:center;font-size:14px;}
-  .sidebar-bottom{
-    border-top:1px solid var(--border);
-    padding-top:10px;margin-top:10px;
-  }
-  .user-card{
-    display:flex;align-items:center;gap:8px;
-    padding:6px 6px;
-  }
-  .avatar{
-    width:34px;height:34px;border-radius:50%;
-    background:linear-gradient(135deg,#f0864f,#e05038);
-    color:#fff;display:flex;align-items:center;justify-content:center;
-    font-size:15px;font-weight:600;flex-shrink:0;
-  }
-  .user-info{flex:1;min-width:0;}
-  .user-name{font-weight:600;font-size:13px;}
-  .user-role{
-    display:inline-block;font-size:10.5px;color:var(--accent-deep);
-    background:var(--accent-soft);border-radius:4px;padding:0 5px;margin-top:2px;
-  }
-  .logout-btn{
-    font-size:11.5px;color:#999;cursor:pointer;border:1px solid #e5e0dc;
-    border-radius:6px;padding:3px 8px;background:#fff;
-  }
-  .logout-btn:hover{color:var(--accent);border-color:var(--accent);}
-  .sync-status{
-    text-align:center;font-size:10.5px;color:var(--text-sub);
-    padding:6px 4px 0;line-height:1.5;
-  }
-  .sync-status .st{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;background:#bbb;}
-  .sync-status .st.ok{background:#4caf7d;}
-  .sync-status .st.err{background:#e05038;}
-  .sync-status .st.pend{background:#e8a33d;}
-
-  /* ============ 主区域 ============ */
-  .main{flex:1;overflow-y:auto;padding:20px 26px 40px;}
-  .page-title{font-size:19px;font-weight:700;margin-bottom:16px;padding-left:2px;}
-  .view{display:none;}
-  .view.active{display:block;}
-  .card{
-    background:var(--card);border-radius:var(--radius);
-    border:1px solid var(--border);
-    padding:18px 22px;margin-bottom:18px;
-  }
-  .card-head{
-    display:flex;align-items:center;justify-content:space-between;
-    margin-bottom:14px;
-  }
-  .card-head h3{font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:8px;}
-  .card-head h3::before{
-    content:"";width:7px;height:7px;border-radius:50%;
-    background:var(--accent);display:inline-block;
-  }
-  .btn{
-    border:1px solid var(--accent);color:var(--accent-deep);
-    background:#fff;border-radius:8px;padding:5px 13px;
-    font-size:12.5px;cursor:pointer;transition:all .15s;
-  }
-  .btn:hover{background:var(--accent-soft);}
-  .btn.solid{background:var(--accent);color:#fff;border-color:var(--accent);}
-  .btn.solid:hover{background:#cf4530;}
-  .btn.mini{padding:3px 9px;font-size:11.5px;border-radius:6px;}
-
-  /* 倒计时 */
-  .empty-state{
-    text-align:center;padding:28px 0 20px;color:var(--text-sub);
-  }
-  .empty-state .sprout{font-size:30px;margin-bottom:10px;}
-  .empty-state .txt{font-size:13px;}
-  .countdown-box{text-align:center;padding:20px 0 14px;}
-  .countdown-box .cd-label{color:var(--text-sub);font-size:13px;margin-bottom:8px;}
-  .countdown-box .cd-main{font-size:24px;font-weight:700;color:var(--accent-deep);}
-  .countdown-box .cd-sub{color:var(--text-sub);font-size:12.5px;margin-top:8px;}
-
-  /* 课表 */
-  .tt-table{width:100%;border-collapse:collapse;table-layout:fixed;}
-  .tt-table th,.tt-table td{
-    border-bottom:1px solid #f2ece7;padding:7px 6px;
-    font-size:12.5px;text-align:left;vertical-align:top;
-  }
-  .tt-table tr:last-child td{border-bottom:none;}
-  .tt-table th{
-    font-weight:600;color:#666;text-align:center;
-    background:#faf7f5;border-radius:8px 8px 0 0;
-    padding:8px 6px;border-bottom:1px solid #f2ece7;
-  }
-  .tt-table th.today{background:var(--today-head);color:var(--accent-deep);}
-  .tt-table td.today{background:var(--today-bg);}
-  .tt-table td.period{
-    color:var(--text-sub);font-size:11.5px;line-height:1.5;width:86px;
-  }
-  .tt-table td.period .pname{color:#666;font-weight:600;font-size:12px;}
-  .tt-cell{cursor:pointer;border-radius:6px;transition:background .12s;line-height:1.5;}
-  .tt-cell:hover{background:#fbe4d6;}
-  .tt-cell .subj{color:#444;font-weight:600;font-size:12.5px;}
-  .tt-cell .cls{color:#999;font-size:11.5px;}
-  .tt-cell.empty{color:#d8d2cc;text-align:center;cursor:default;}
-  .tt-cell.empty.editable{cursor:pointer;}
-  .tt-cell.empty.editable:hover{background:#fbe4d6;color:#c9a;}
-  .lunch-row td{
-    background:var(--today-bg);text-align:center !important;
-    color:#c99a7c;font-size:12.5px;font-weight:600;padding:6px !important;
-  }
-
-  /* 待办 */
-  .tabs{display:flex;gap:8px;margin-bottom:14px;}
-  .tab{
-    padding:5px 16px;border-radius:8px;font-size:13px;cursor:pointer;
-    color:#888;background:#f5f2ef;transition:all .15s;
-  }
-  .tab.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:600;}
-  .todo-item{
-    display:flex;align-items:center;gap:10px;
-    padding:10px 6px;border-bottom:1px solid #f5efe9;
-  }
-  .todo-item:last-child{border-bottom:none;}
-  .todo-check{
-    width:18px;height:18px;border-radius:50%;border:1.5px solid #d8cfc8;
-    cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:11px;transition:all .15s;
-  }
-  .todo-check.done{background:#4caf7d;border-color:#4caf7d;}
-  .todo-text{flex:1;font-size:13.5px;}
-  .todo-item.finished .todo-text{color:#b5aea8;text-decoration:line-through;}
-  .todo-del{color:#ccc;cursor:pointer;font-size:15px;padding:0 4px;}
-  .todo-del:hover{color:var(--accent);}
-
-  /* 占位视图 */
-  .placeholder{text-align:center;padding:70px 0;color:var(--text-sub);}
-  .placeholder .ico{font-size:40px;margin-bottom:14px;}
-
-  /* 设置页 */
-  .set-row{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:12px 0;border-bottom:1px solid #f5efe9;gap:14px;flex-wrap:wrap;
-  }
-  .set-row:last-child{border-bottom:none;}
-  .set-label{font-weight:600;font-size:13.5px;}
-  .set-desc{color:var(--text-sub);font-size:12px;margin-top:3px;font-weight:400;}
-  .input{
-    border:1px solid #e5ddd6;border-radius:8px;padding:7px 12px;
-    font-size:13px;outline:none;width:230px;
-  }
-  .input:focus{border-color:var(--accent);}
-  .code-text{font-family:Consolas,monospace;color:var(--accent-deep);font-weight:700;letter-spacing:1px;}
-
-  /* 弹窗 */
-  .modal-mask{
-    display:none;position:fixed;inset:0;background:rgba(50,40,35,.35);
-    z-index:100;align-items:center;justify-content:center;
-  }
-  .modal-mask.show{display:flex;}
-  .modal{
-    background:#fff;border-radius:16px;padding:24px 26px;
-    width:340px;max-width:92vw;box-shadow:0 12px 40px rgba(80,50,30,.18);
-  }
-  .modal h4{font-size:15px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
-  .modal h4::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);}
-  .form-row{margin-bottom:12px;}
-  .form-row label{display:block;font-size:12px;color:#888;margin-bottom:5px;}
-  .form-row .input{width:100%;}
-  .modal-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
-  .link-btn{color:#c9a292;font-size:12px;cursor:pointer;margin-right:auto;align-self:center;}
-  .link-btn:hover{color:var(--accent);}
-  .toast{
-    position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);
-    background:#3a3a3a;color:#fff;padding:9px 22px;border-radius:20px;
-    font-size:13px;z-index:200;transition:transform .3s;pointer-events:none;
-  }
-  .toast.show{transform:translateX(-50%) translateY(0);}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 60px;}
+  header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--brand),#5b8bff);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:var(--shadow);}
+  h1{font-size:22px;margin:0;}
+  .sub{color:var(--sub);font-size:14px;margin:2px 0 0;}
+  .conn{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;background:#eef3ff;color:var(--brand-d);margin-left:auto;}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
+  .conn.local{background:#fff4e6;color:#b9760f;} .conn.local .dot{background:#e08a1e;}
+  .conn.off{background:#fdecec;color:#b42323;} .conn.off .dot{background:#e0496b;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0;}
+  .btn{cursor:pointer;border:none;border-radius:12px;padding:11px 18px;font-size:15px;font-weight:700;color:#fff;
+    background:var(--brand);box-shadow:var(--shadow);transition:.15s;white-space:nowrap;}
+  .btn:hover{background:var(--brand-d);} .btn:active{transform:translateY(1px);}
+  .btn.danger{background:var(--danger);} .btn.danger:hover{background:#c43a59;}
+  .btn.ghost{background:#fff;color:var(--brand-d);border:1px solid var(--line);}
+  .btn.ghost.del{padding:6px 12px;font-size:13px;color:var(--danger);border-color:#f4c4c4;} .btn.ghost.del:hover{background:#fdecec;}
+  .filterbadge{font-size:14px;background:#eaf1ff;color:var(--brand-d);border:1px solid #d6e2ff;border-radius:999px;padding:6px 14px;display:none;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .stat{background:#f6f9ff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:96px;}
+  .stat .n{font-size:20px;font-weight:800;} .stat .l{font-size:12px;color:var(--sub);}
+  .stat.m .n{color:var(--male);} .stat.f .n{color:var(--female);}
+  svg{width:100%;height:auto;display:block;}
+  .legend{display:flex;gap:18px;align-items:center;font-size:13px;color:var(--sub);margin-top:8px;flex-wrap:wrap;}
+  .lg{display:inline-flex;align-items:center;gap:6px;} .sw{width:12px;height:12px;border-radius:50%;display:inline-block;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line);}
+  th{font-size:13px;color:var(--sub);font-weight:600;}
+  tr.grouprow{cursor:pointer;transition:.12s;} tr.grouprow:hover{background:#f3f7ff;}
+  tr.grouprow.active{background:#e7f0ff;outline:2px solid var(--brand);}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;}
+  .pill.M{background:#eaf1ff;color:var(--male);} .pill.F{background:#fdeaf1;color:var(--female);}
+  .empty{text-align:center;color:var(--sub);padding:36px 0;font-size:15px;}
+  .foot{font-size:12px;color:var(--sub);margin-top:20px;text-align:center;}
 </style>
 </head>
 <body>
-
-<!-- ======== 侧边栏 ======== -->
-<div class="sidebar">
-  <div class="brand"><span class="dot"></span>AI教师工作台</div>
-  <div class="nav" id="nav"><div class="nav-item active" onclick="goto('dashboard')"><span class="ico">🏠</span>工作台</div><div class="nav-item" onclick="goto('timetable')"><span class="ico">📅</span>课表</div><div class="nav-item" onclick="goto('calendar')"><span class="ico">🗓️</span>校历与备忘</div><div class="nav-item" onclick="goto('prep')"><span class="ico">📚</span>日常备课</div><div class="nav-item" onclick="goto('students')"><span class="ico">👥</span>学生名册</div><div class="nav-item" onclick="goto('club')"><span class="ico">🔬</span>科学社团</div><div class="nav-item" onclick="goto('homework')"><span class="ico">📝</span>作业登记</div><div class="nav-item" onclick="goto('lab')"><span class="ico">⚗️</span>科学实验室</div><div class="nav-item" onclick="goto('quiz')"><span class="ico">🎯</span>课堂抽查</div><div class="nav-item" onclick="goto('bank')"><span class="ico">📂</span>科学题库</div><div class="nav-item" onclick="goto('grades')"><span class="ico">📊</span>成绩分析</div><div class="nav-item" onclick="goto('settings')"><span class="ico">⚙️</span>设置</div></div>
-  <div class="sidebar-bottom">
-    <div class="user-card">
-      <div class="avatar" id="avatarT">林</div>
-      <div class="user-info">
-        <div class="user-name" id="userNameT">林老师</div>
-        <span class="user-role">教师</span>
-      </div>
-      <button class="logout-btn" onclick="toast('演示版：无需登录')">退出</button>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">🫁</div>
+    <div>
+      <h1>测量肺活量｜教师看板</h1>
+      <div class="sub">班级肺活量点阵 · 纵轴为肺活量（毫升），点阵颜色表示性别，虚线表示男女生平均值</div>
     </div>
-    <div class="sync-status" id="syncStatus"><span class="st err"></span>云端暂不可用，本地保存中</div>
+    <span class="conn" id="conn"><span class="dot"></span>连接中…</span>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn danger" id="clearBtn">清除数据</button>
+    <span class="filterbadge" id="filterBadge"></span>
+    <button class="btn ghost" id="allBtn" style="display:none">显示全部小组</button>
   </div>
+
+  <div class="card">
+    <h2>班级肺活量点阵 <span id="scopeTip" style="font-size:13px;color:var(--sub);font-weight:400"></span></h2>
+    <div class="stats" id="stats"></div>
+    <div id="chart"></div>
+    <div class="legend">
+      <span class="lg"><span class="sw" style="background:var(--male)"></span>男生</span>
+      <span class="lg"><span class="sw" style="background:var(--female)"></span>女生</span>
+      <span class="lg"><span class="sw" style="background:var(--male);opacity:.55"></span>男生平均（虚线）</span>
+      <span class="lg"><span class="sw" style="background:var(--female);opacity:.55"></span>女生平均（虚线）</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>各小组提交明细（点击某一行可只看该组）</h2>
+    <div id="table"></div>
+  </div>
+
+  <div class="foot">说明：学生用平板/手机打开本页提交，教师用电脑打开本页即可实时查看。<br>
+  每节课开始前点“清除数据”清空上一节课全部数据；点击下方任意小组行，可单独查看该组。</div>
 </div>
-
-<!-- ======== 主区域 ======== -->
-<div class="main">
-  <!-- 工作台 -->
-  <div class="view active" id="view-dashboard">
-    <div class="page-title">工作台</div>
-
-    <div class="card">
-      <div class="card-head"><h3>上课倒计时</h3></div>
-      <div id="countdownBox"><div class="empty-state"><div class="sprout">🌱</div><div class="txt">今日课程已结束，辛苦了～</div></div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <h3>本周课表</h3>
-        <button class="btn" id="editModeBtn" onclick="toggleEditMode()">查看与调整</button>
-      </div>
-      <table class="tt-table" id="ttTable"><tbody><tr><th style="width:86px"></th><th class="">周一 10/26</th><th class="">周二 10/27</th><th class="">周三 10/28</th><th class="">周四 10/29</th><th class="today">周五 10/30</th></tr><tr><td class="period"><div class="pname">第1节</div>08:30 - 09:30</td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class="today"><div class="tt-cell empty" onclick="">—</div></td></tr><tr><td class="period"><div class="pname">第2节</div>09:40 - 10:20</td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class="today"><div class="tt-cell empty" onclick="">—</div></td></tr><tr><td class="period"><div class="pname">第3节</div>10:30 - 11:15</td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell" onclick="editCell(2,2)"><div class="subj">科学</div><div class="cls">五5班</div></div></td><td class=""><div class="tt-cell" onclick="editCell(3,2)"><div class="subj">科学</div><div class="cls">五5班</div></div></td><td class="today"><div class="tt-cell" onclick="editCell(4,2)"><div class="subj">科学</div><div class="cls">五2班</div></div></td></tr><tr><td class="period"><div class="pname">第4节</div>11:20 - 12:05</td><td class=""><div class="tt-cell" onclick="editCell(0,3)"><div class="subj">科学</div><div class="cls">三2班</div></div></td><td class=""><div class="tt-cell" onclick="editCell(1,3)"><div class="subj">科学</div><div class="cls">三3班</div></div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell" onclick="editCell(3,3)"><div class="subj">科学</div><div class="cls">五1班</div></div></td><td class="today"><div class="tt-cell" onclick="editCell(4,3)"><div class="subj">科学</div><div class="cls">五3班</div></div></td></tr><tr class="lunch-row"><td colspan="6">🍚 午休</td></tr><tr><td class="period"><div class="pname">第5节</div>14:10 - 14:50</td><td class=""><div class="tt-cell" onclick="editCell(0,5)"><div class="subj">科学</div><div class="cls">四4班</div></div></td><td class=""><div class="tt-cell" onclick="editCell(1,5)"><div class="subj">科学</div><div class="cls">五2班</div></div></td><td class=""><div class="tt-cell" onclick="editCell(2,5)"><div class="subj">科学</div><div class="cls">五5班</div></div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class="today"><div class="tt-cell" onclick="editCell(4,5)"><div class="subj">科学</div><div class="cls">三2班</div></div></td></tr><tr><td class="period"><div class="pname">第6节</div>15:00 - 15:45</td><td class=""><div class="tt-cell" onclick="editCell(0,6)"><div class="subj">科学</div><div class="cls">五1班</div></div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell" onclick="editCell(2,6)"><div class="subj">科学</div><div class="cls">五3班</div></div></td><td class=""><div class="tt-cell" onclick="editCell(3,6)"><div class="subj">科学</div><div class="cls">五1班</div></div></td><td class="today"><div class="tt-cell" onclick="editCell(4,6)"><div class="subj">科学</div><div class="cls">三1班</div></div></td></tr><tr><td class="period"><div class="pname">第7节</div>15:50 - 16:35</td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell" onclick="editCell(3,7)"><div class="subj">体育活动</div><div class="cls">四3班</div></div></td><td class="today"><div class="tt-cell" onclick="editCell(4,7)"><div class="subj">体育活动</div><div class="cls">三3班</div></div></td></tr><tr><td class="period"><div class="pname">第8节</div>16:45 - 17:30</td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class=""><div class="tt-cell empty" onclick="">—</div></td><td class="today"><div class="tt-cell empty" onclick="">—</div></td></tr></tbody></table>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <h3>待办清单</h3>
-        <button class="btn solid" onclick="openTodoModal()">＋ 新增</button>
-      </div>
-      <div class="tabs">
-        <div class="tab active" id="tabDoing" onclick="switchTodoTab('doing')">进行中 (0)</div>
-        <div class="tab" id="tabDone" onclick="switchTodoTab('done')">已完成 (0)</div>
-      </div>
-      <div id="todoList"><div class="empty-state"><div class="sprout">🌱</div><div class="txt">暂无进行中的待办，点击右上角新增</div></div></div>
-    </div>
-  </div>
-
-  <!-- 设置 -->
-  <div class="view" id="view-settings">
-    <div class="page-title">设置</div>
-    <div class="card">
-      <div class="card-head"><h3>云端同步</h3></div>
-      <div class="set-row">
-        <div>
-          <div class="set-label">同步状态</div>
-          <div class="set-desc" id="syncDesc">同一链接在任何电脑打开，数据自动实时同步（约5秒）。</div>
-        </div>
-        <button class="btn" onclick="manualSync()">立即同步</button>
-      </div>
-      <div class="set-row">
-        <div>
-          <div class="set-label">同步码</div>
-          <div class="set-desc">其他电脑打开本网址即可自动加入同步；也可把同步码粘贴到下方手动加入。</div>
-        </div>
-        <div><span class="code-text" id="syncCodeText">未开启</span></div>
-      </div>
-      <div class="set-row">
-        <div>
-          <div class="set-label">复制访问链接</div>
-          <div class="set-desc">把链接发到教室电脑打开（微信/QQ发给自己即可）。</div>
-        </div>
-        <button class="btn" onclick="copyShareLink()">复制链接</button>
-      </div>
-      <div class="set-row">
-        <div>
-          <div class="set-label">加入同步</div>
-          <div class="set-desc">输入已有的同步码，接管该云端数据。</div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <input class="input" id="joinCodeInput" placeholder="输入同步码">
-          <button class="btn" onclick="joinSync()">加入</button>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head"><h3>个人信息</h3></div>
-      <div class="set-row">
-        <div>
-          <div class="set-label">教师姓名</div>
-          <div class="set-desc">显示在左下角与头像。</div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <input class="input" id="nameInput" placeholder="如：林老师">
-          <button class="btn" onclick="saveName()">保存</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 其他占位页 -->
-  <div class="view" id="view-other">
-    <div class="page-title" id="otherTitle"></div>
-    <div class="placeholder">
-      <div class="ico">🚧</div>
-      <div>功能建设中，我们慢慢来 —— 先把工作台用起来</div>
-    </div>
-  </div>
-</div>
-
-<!-- 课表单元格编辑弹窗 -->
-<div class="modal-mask" id="cellModal">
-  <div class="modal">
-    <h4 id="cellModalTitle">调整课程</h4>
-    <div class="form-row">
-      <label>科目</label>
-      <input class="input" id="cellSubject" placeholder="如：科学">
-    </div>
-    <div class="form-row">
-      <label>班级</label>
-      <input class="input" id="cellClass" placeholder="如：五1班">
-    </div>
-    <div class="modal-btns">
-      <span class="link-btn" onclick="clearCell()">清空此格</span>
-      <button class="btn" onclick="closeCellModal()">取消</button>
-      <button class="btn solid" onclick="saveCell()">保存</button>
-    </div>
-  </div>
-</div>
-
-<!-- 待办弹窗 -->
-<div class="modal-mask" id="todoModal">
-  <div class="modal">
-    <h4>新增待办</h4>
-    <div class="form-row">
-      <label>待办内容</label>
-      <input class="input" id="todoInput" placeholder="如：准备明天科学实验器材" onkeydown="if(event.key==='Enter')saveTodo()">
-    </div>
-    <div class="modal-btns">
-      <button class="btn" onclick="closeTodoModal()">取消</button>
-      <button class="btn solid" onclick="saveTodo()">添加</button>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toastEl"></div>
 
 <script>
-/* ================================================================
-   数据模型（全部可云端同步）
-   ================================================================ */
-const PERIODS = [
-  {name:"第1节", t:"08:30 - 09:30"},
-  {name:"第2节", t:"09:40 - 10:20"},
-  {name:"第3节", t:"10:30 - 11:15"},
-  {name:"第4节", t:"11:20 - 12:05"},
-  {name:"午休",  lunch:true},
-  {name:"第5节", t:"14:10 - 14:50"},
-  {name:"第6节", t:"15:00 - 15:45"},
-  {name:"第7节", t:"15:50 - 16:35"},
-  {name:"第8节", t:"16:45 - 17:30"},
-];
-const DAY_NAMES = ["周一","周二","周三","周四","周五"];
-const NAV_ITEMS = [
-  {id:"dashboard", ico:"🏠", label:"工作台"},
-  {id:"timetable", ico:"📅", label:"课表"},
-  {id:"calendar",  ico:"🗓️", label:"校历与备忘"},
-  {id:"prep",      ico:"📚", label:"日常备课"},
-  {id:"students",  ico:"👥", label:"学生名册"},
-  {id:"club",      ico:"🔬", label:"科学社团"},
-  {id:"homework",  ico:"📝", label:"作业登记"},
-  {id:"lab",       ico:"⚗️", label:"科学实验室"},
-  {id:"quiz",      ico:"🎯", label:"课堂抽查"},
-  {id:"bank",      ico:"📂", label:"科学题库"},
-  {id:"grades",    ico:"📊", label:"成绩分析"},
-  {id:"settings",  ico:"⚙️", label:"设置"},
-];
+/* ===== 统一数据存储/同步层（与学生端一致） ===== */
+const Store = (function(){
+  const LS_KEY='feihuoliang_v1_state';
+  const MQTT_URL='wss://broker.emqx.io:8084/mqtt';
+  const ROOM=(new URLSearchParams(location.search).get('room')||'default').toString().slice(0,30).replace(/[^\w一-龥-]/g,'')||'default';
+  const STATE_T='feihuoliang/v1/'+ROOM+'/state';
+  let mode='init', client=null, state={submissions:[]};
+  let pending=[], flushed=false, online=false;
+  const stateCbs=[], modeCbs=[];
+  let bc=null; try{ bc=new BroadcastChannel('feihuoliang_v1'); }catch(e){}
 
-function defaultData(){
-  // 课表：schedule[dayIndex][periodIndex] = "科目|班级"
-  const s = Array.from({length:5},()=>Array(PERIODS.length).fill(""));
-  const set=(d,p,subj,cls)=>{ s[d][p]=subj+"|"+cls; };
-  // 按截图 seeded（第3节=索引2，第4节=索引3，第5节=索引4……午休占索引4）
-  const P={p1:0,p2:1,p3:2,p4:3,p5:5,p6:6,p7:7,p8:8};
-  set(2,P.p3,"科学","五5班"); set(3,P.p3,"科学","五5班"); set(4,P.p3,"科学","五2班");
-  set(0,P.p4,"科学","三2班"); set(1,P.p4,"科学","三3班"); set(3,P.p4,"科学","五1班"); set(4,P.p4,"科学","五3班");
-  set(0,P.p5,"科学","四4班"); set(1,P.p5,"科学","五2班"); set(2,P.p5,"科学","五5班"); set(4,P.p5,"科学","三2班");
-  set(0,P.p6,"科学","五1班"); set(2,P.p6,"科学","五3班"); set(3,P.p6,"科学","五1班"); set(4,P.p6,"科学","三1班");
-  set(3,P.p7,"体育活动","四3班"); set(4,P.p7,"体育活动","三3班");
-  return {
-    version:1,
-    updatedAt:Date.now(),
-    teacherName:"林老师",
-    schedule:s,
-    todos:[]
-  };
-}
-
-/* ================================================================
-   本地 + 云端状态
-   ================================================================ */
-const LS_KEY="twb_local_data", LS_SYNC="twb_sync_id";
-let data = loadLocal();
-let syncId = getSyncIdFromUrl() || localStorage.getItem(LS_SYNC) || "";
-let editMode=false, todoTab="doing";
-let cellEdit={d:-1,p:-1};
-let lastRemoteSnapshot=null, pullTimer=null, syncing=false;
-
-function loadLocal(){
-  try{
-    const raw=localStorage.getItem(LS_KEY);
-    if(raw){const d=JSON.parse(raw); if(d&&d.version) return d;}
-  }catch(e){}
-  return defaultData();
-}
-function persistLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
-function getSyncIdFromUrl(){
-  const m=location.hash.match(/s=([A-Za-z0-9]+)/);
-  return m?m[1]:"";
-}
-
-/* ---------- 云端同步（jsonblob 免费存储 + 轮询） ---------- */
-const API="https://jsonblob.com/api/jsonBlob";
-async function createCloud(){
-  const res=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify(data)});
-  if(!res.ok) throw new Error("create failed");
-  const loc=res.headers.get("Location")||res.headers.get("X-jsonblob")||"";
-  const id=loc.split("/").filter(Boolean).pop();
-  if(!id) throw new Error("no id");
-  return id;
-}
-async function pullCloud(){
-  const res=await fetch(API+"/"+syncId,{headers:{"Accept":"application/json"}});
-  if(!res.ok) throw new Error("pull failed");
-  return res.json();
-}
-async function pushCloud(){
-  const res=await fetch(API+"/"+syncId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
-  if(!res.ok) throw new Error("push failed");
-}
-async function initSync(){
-  if(location.hash){ // 清理地址栏但不刷新
-    history.replaceState(null,"",location.pathname+location.search);
+  function emitState(){ stateCbs.forEach(cb=>cb(state)); }
+  function emitMode(){ modeCbs.forEach(cb=>cb(mode,online)); }
+  function onState(cb){ stateCbs.push(cb); cb(state); }
+  function onMode(cb){ modeCbs.push(cb); }
+  function loadLS(){ try{const d=JSON.parse(localStorage.getItem(LS_KEY)); if(d&&d.submissions) return d;}catch(e){} return {submissions:[]}; }
+  function saveLS(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)); }
+  function publishMqtt(d){ state=d; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(d), {retain:true, qos:0}); emitState(); }
+  function flushPending(){ if(flushed) return; flushed=true; const map={}; (state.submissions||[]).forEach(s=>map[s.group]=s); pending.forEach(sub=>map[sub.group]=sub); state.submissions=Object.values(map); pending=[]; if(client&&client.connected) client.publish(STATE_T, JSON.stringify(state), {retain:true, qos:0}); emitState(); }
+  function addSubmission(sub){
+    if(mode==='local'){ const d=loadLS(); const i=d.submissions.findIndex(s=>s.group===sub.group); if(i>=0)d.submissions[i]=sub; else d.submissions.push(sub); saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; }
+    if(online && flushed){ const d={submissions:state.submissions.slice()}; const i=d.submissions.findIndex(s=>s.group===sub.group); if(i>=0)d.submissions[i]=sub; else d.submissions.push(sub); publishMqtt(d); }
+    else { pending.push(sub); }
   }
-  if(syncId){
-    localStorage.setItem(LS_SYNC,syncId);
-    await safePull(true);
-  }else{
-    setSyncUI("pend","正在开启云端…");
-    try{
-      syncId=await createCloud();
-      localStorage.setItem(LS_SYNC,syncId);
-      await pushCloud();
-      setSyncUI("ok","云端已开启");
-    }catch(e){
-      setSyncUI("err","云端暂不可用，本地保存中");
+  function clearAll(){ pending=[]; if(mode==='local'){ const d={submissions:[]}; saveLS(d); state=d; if(bc) bc.postMessage({type:'state',d}); emitState(); return; } publishMqtt({submissions:[]}); }
+  function getState(){ return state; }
+  function init(){
+    if(typeof window.mqtt==='undefined'){ goLocal(); return; }
+    try{ client=mqtt.connect(MQTT_URL,{connectTimeout:4000,reconnectPeriod:2500,clean:true}); }
+    catch(e){ goLocal(); return; }
+    let connected=false;
+    const to=setTimeout(()=>{ if(!connected) goLocal(); }, 5000);
+    client.on('connect',()=>{ connected=true; online=true; clearTimeout(to); if(mode!=='mqtt'){mode='mqtt';emitMode();} client.subscribe(STATE_T,{qos:0},()=>{}); setTimeout(flushPending,700); });
+    client.on('message',(t,m)=>{ if(t===STATE_T){ try{const d=JSON.parse(m.toString()); if(d&&d.submissions){ state=d; emitState(); if(!flushed) flushPending(); }}catch(e){} } });
+    client.on('error',()=>{ if(!connected) goLocal(); });
+    client.on('close',()=>{ online=false; emitMode(); });
+    client.on('reconnect',()=>{ online=false; emitMode(); });
+  }
+  function goLocal(){ mode='local'; online=false; state=loadLS(); emitState(); emitMode();
+    window.addEventListener('storage',e=>{ if(e.key===LS_KEY){ const d=loadLS(); state=d; emitState(); } });
+    if(bc) bc.addEventListener('message',ev=>{ if(ev.data&&ev.data.type==='state'){ state=ev.data.d; emitState(); } });
+  }
+  function removeSubmission(id){
+    state.submissions=state.submissions.filter(s=>s.id!==id);
+    if(mode==='local'){ saveLS(state); if(bc) bc.postMessage({type:'state',d:state}); emitState(); return; }
+    publishMqtt(state);
+  }
+  return {init,onState,onMode,addSubmission,clearAll,removeSubmission,getState};
+})();
+
+/* ===== 教师页面逻辑 ===== */
+(function(){
+  let selectedGroup=null;
+  const chartEl=document.getElementById('chart');
+  const tableEl=document.getElementById('table');
+  const statsEl=document.getElementById('stats');
+  const filterBadge=document.getElementById('filterBadge');
+  const allBtn=document.getElementById('allBtn');
+  const scopeTip=document.getElementById('scopeTip');
+
+  function flatten(subs){ const pts=[]; subs.forEach(s=>(s.members||[]).forEach(m=>pts.push({gender:m.gender,value:m.value,group:s.group,ts:s.ts}))); return pts; }
+  function niceMax(v){ if(v<=0) return 1000; const s=500; return Math.ceil(v/s)*s+s; }
+
+  function render(state){
+    let subs=(state.submissions||[]).slice();
+    if(selectedGroup) subs=subs.filter(s=>s.group===selectedGroup);
+    const pts=flatten(subs);
+    // 统计
+    const males=pts.filter(p=>p.gender==='M'), females=pts.filter(p=>p.gender==='F');
+    const mAvg=males.length?Math.round(males.reduce((a,b)=>a+b.value,0)/males.length):null;
+    const fAvg=females.length?Math.round(females.reduce((a,b)=>a+b.value,0)/females.length):null;
+    statsEl.innerHTML=`
+      <div class="stat"><div class="n">${pts.length}</div><div class="l">总人数</div></div>
+      <div class="stat m"><div class="n">${males.length}</div><div class="l">男生</div></div>
+      <div class="stat f"><div class="n">${females.length}</div><div class="l">女生</div></div>
+      <div class="stat m"><div class="n">${mAvg===null?'—':mAvg}</div><div class="l">男生平均(ml)</div></div>
+      <div class="stat f"><div class="n">${fAvg===null?'—':fAvg}</div><div class="l">女生平均(ml)</div></div>`;
+    chartEl.innerHTML = pts.length? buildSVG(pts,mAvg,fAvg) : '<div class="empty">暂无数据，等待学生提交…</div>';
+    // 表格（全部小组，选中高亮）
+    const allSubs=(state.submissions||[]);
+    if(allSubs.length===0){ tableEl.innerHTML='<div class="empty">暂无小组提交。</div>'; }
+    else{
+      let rows='';
+      allSubs.slice().reverse().forEach(sub=>{
+        const chips=(sub.members||[]).map(m=>`<span class="pill ${m.gender}">${m.gender==='M'?'男':'女'} ${m.value}</span>`).join(' ');
+        const active=(selectedGroup===sub.group)?' active':'';
+        rows+=`<tr class="grouprow${active}" data-group="${encodeURIComponent(sub.group)}"><td>${sub.group}</td><td>${new Date(sub.ts).toLocaleTimeString('zh-CN')}</td><td>${chips}</td><td><button class="btn ghost del" data-id="${sub.id}">删除</button></td></tr>`;
+      });
+      tableEl.innerHTML=`<table><thead><tr><th>小组</th><th>提交时间</th><th>组员（性别 肺活量ml）</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table>`;
+      [...tableEl.querySelectorAll('.grouprow')].forEach(tr=>{
+        tr.addEventListener('click',()=>{ const g=decodeURIComponent(tr.dataset.group); selectedGroup=(selectedGroup===g)?null:g; updateFilter(); render(Store.getState()); });
+      });
+      [...tableEl.querySelectorAll('.del')].forEach(btn=>{
+        btn.addEventListener('click',function(e){
+          e.stopPropagation();
+          const id=this.dataset.id;
+          if(!confirm('确定删除该小组的提交记录吗？\n删除后该小组可在学生端重新提交。')) return;
+          Store.removeSubmission(id); render(Store.getState());
+        });
+      });
     }
+    // 筛选提示
+    if(selectedGroup){ filterBadge.style.display='inline-block'; filterBadge.textContent='仅看：'+selectedGroup; allBtn.style.display='inline-block'; scopeTip.textContent='（当前仅显示「'+selectedGroup+'」）'; }
+    else { filterBadge.style.display='none'; allBtn.style.display='none'; scopeTip.textContent=''; }
   }
-  renderSettings();
-  startPolling();
-}
-function startPolling(){
-  if(pullTimer) clearInterval(pullTimer);
-  pullTimer=setInterval(()=>safePull(false),5000);
-}
-async function safePull(first){
-  if(!syncId||syncing) return;
-  syncing=true;
-  try{
-    const remote=await pullCloud();
-    if(remote && remote.updatedAt){
-      if(first || remote.updatedAt>data.updatedAt){
-        const changed=JSON.stringify(remote)!==JSON.stringify(data);
-        if(changed){
-          data=remote; persistLocal(); renderAll();
-        }
-        setSyncUI("ok","云端同步中");
-      }
-    }else{
-      setSyncUI("ok","云端同步中");
-    }
-  }catch(e){
-    setSyncUI("err","同步暂时中断，稍后重试");
-  }
-  syncing=false;
-}
-async function commit(){ // 本地修改后调用
-  data.updatedAt=Date.now();
-  persistLocal(); renderAll();
-  if(syncId){
-    setSyncUI("pend","正在同步…");
-    try{ await pushCloud(); setSyncUI("ok","云端同步中"); }
-    catch(e){ setSyncUI("err","同步暂时中断，稍后重试"); }
-  }
-}
-function setSyncUI(cls,text){
-  document.getElementById("syncStatus").innerHTML=
-    '<span class="st '+cls+'"></span>'+text;
-}
-async function manualSync(){
-  if(!syncId){ await initSync(); return; }
-  toast("同步中…");
-  await safePull(false);
-  try{ await pushCloud(); }catch(e){}
-  toast("已同步 ✓");
-}
-async function joinSync(){
-  const code=document.getElementById("joinCodeInput").value.trim();
-  if(!code){ toast("请输入同步码"); return; }
-  syncId=code; localStorage.setItem(LS_SYNC,syncId);
-  await safePull(true);
-  toast("已加入云端同步 ✓");
-  renderSettings();
-}
-function copyShareLink(){
-  const link=location.origin+location.pathname+"#s="+syncId;
-  (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(
-    ()=>toast("链接已复制，发到教室电脑打开即可"),
-    ()=>{ prompt("请手动复制：",link); }
-  );
-}
-function saveName(){
-  const v=document.getElementById("nameInput").value.trim();
-  if(!v) return;
-  data.teacherName=v; commit(); toast("已保存");
-  renderSettings();
-}
 
-/* ================================================================
-   渲染
-   ================================================================ */
-function renderNav(){
-  document.getElementById("nav").innerHTML=NAV_ITEMS.map(n=>
-    '<div class="nav-item'+(n.id===currentView?" active":"")+'" onclick="goto(\''+n.id+'\')">'+
-    '<span class="ico">'+n.ico+'</span>'+n.label+'</div>').join("");
-}
-let currentView="dashboard";
-function goto(id){
-  currentView=id;
-  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
-  if(id==="dashboard"||id==="settings"){
-    document.getElementById("view-"+id).classList.add("active");
-  }else{
-    const item=NAV_ITEMS.find(n=>n.id===id);
-    document.getElementById("otherTitle").textContent=item?item.label:"";
-    document.getElementById("view-other").classList.add("active");
+  function buildSVG(pts,mAvg,fAvg){
+    const W=720,H=420,L=60,R=24,T=24,B=46, pw=W-L-R, ph=H-T-B;
+    const maxV=niceMax(Math.max(...pts.map(p=>p.value))), n=pts.length;
+    const xAt=i=> n===1? L+pw/2 : L+(i+0.5)/n*pw;
+    const yAt=v=> T+ph*(1-v/maxV);
+    let yA=''; for(let i=0;i<=5;i++){ const v=Math.round(maxV*i/5), y=yAt(v); yA+=`<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="#eef1f7"/><text x="${L-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#6b7891">${v}</text>`; }
+    let av='';
+    if(mAvg!==null){ const y=yAt(mAvg); av+=`<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="var(--male)" stroke-width="1.5" stroke-dasharray="6 5" opacity=".6"/><text x="${W-R}" y="${y-6}" text-anchor="end" font-size="11" fill="var(--male)">男平均 ${mAvg}</text>`; }
+    if(fAvg!==null){ const y=yAt(fAvg); av+=`<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="var(--female)" stroke-width="1.5" stroke-dasharray="6 5" opacity=".6"/><text x="${W-R}" y="${y+14}" text-anchor="end" font-size="11" fill="var(--female)">女平均 ${fAvg}</text>`; }
+    let dots=''; pts.forEach((p,i)=>{ const cx=xAt(i),cy=yAt(p.value),c=p.gender==='M'?'var(--male)':'var(--female)';
+      dots+=`<circle cx="${cx}" cy="${cy}" r="7" fill="${c}" fill-opacity=".85" stroke="#fff" stroke-width="2"/><text x="${cx}" y="${cy-12}" text-anchor="middle" font-size="10" fill="#6b7891">${p.value}</text>`; });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="肺活量点阵图">
+      <line x1="${L}" y1="${T}" x2="${L}" y2="${T+ph}" stroke="#c9d3e3" stroke-width="1.5"/><line x1="${L}" y1="${T+ph}" x2="${W-R}" y2="${T+ph}" stroke="#c9d3e3" stroke-width="1.5"/>
+      ${yA}${av}${dots}
+      <text x="${L}" y="${H-12}" font-size="12" fill="#6b7891">每位学生一个点（按提交顺序从左到右）</text>
+      <text x="${L-44}" y="${T+ph/2}" font-size="12" fill="#6b7891" transform="rotate(-90 ${L-44} ${T+ph/2})" text-anchor="middle">肺活量（毫升）</text></svg>`;
   }
-  renderNav();
-  if(id==="settings") renderSettings();
-}
 
-/* ---- 课表 ---- */
-function mondayOf(d){
-  const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day);
-  x.setHours(0,0,0,0); return x;
-}
-function fmtMD(d){ return (d.getMonth()+1)+"/"+d.getDate(); }
-function renderTimetable(){
-  const mon=mondayOf(new Date());
-  const todayIdx=((new Date().getDay()+6)%7); // 0=周一
-  let html="<tr><th style='width:86px'></th>";
-  for(let d=0;d<5;d++){
-    const dt=new Date(mon); dt.setDate(mon.getDate()+d);
-    html+="<th class='"+(d===todayIdx&&todayIdx<5?"today":"")+"'>"+DAY_NAMES[d]+" "+fmtMD(dt)+"</th>";
-  }
-  html+="</tr>";
-  PERIODS.forEach((p,pi)=>{
-    if(p.lunch){
-      html+="<tr class='lunch-row'><td colspan='6'>🍚 午休</td></tr>";
-      return;
-    }
-    html+="<tr><td class='period'><div class='pname'>"+p.name+"</div>"+p.t+"</td>";
-    for(let d=0;d<5;d++){
-      const v=data.schedule[d]&&data.schedule[d][pi]||"";
-      if(v){
-        const [subj,cls]=v.split("|");
-        html+="<td class='"+(d===todayIdx&&todayIdx<5?"today":"")+"'>"+
-          "<div class='tt-cell' onclick='editCell("+d+","+pi+")'>"+
-          "<div class='subj'>"+esc(subj)+"</div><div class='cls'>"+esc(cls)+"</div></div></td>";
-      }else{
-        html+="<td class='"+(d===todayIdx&&todayIdx<5?"today":"")+"'>"+
-          "<div class='tt-cell empty"+(editMode?" editable":"")+"' onclick='"+(editMode?"editCell("+d+","+pi+")":"")+"'>—</div></td>";
-      }
-    }
-    html+="</tr>";
+  function updateFilter(){ /* 由 render 内部处理显示 */ }
+
+  document.getElementById('clearBtn').addEventListener('click',function(){
+    const cnt=(Store.getState().submissions||[]).length;
+    if(cnt===0){ alert('当前没有数据，无需清除。'); return; }
+    if(!confirm(`确定清除全部数据吗？\n将清空 ${cnt} 个小组、上一节课的全部学生数据，开始新的一节课。此操作不可恢复。`)) return;
+    selectedGroup=null; Store.clearAll(); render(Store.getState());
   });
-  document.getElementById("ttTable").innerHTML=html;
-  document.getElementById("editModeBtn").textContent=editMode?"完成调整":"查看与调整";
-  document.getElementById("editModeBtn").classList.toggle("solid",editMode);
-}
-function toggleEditMode(){
-  editMode=!editMode; renderTimetable();
-  toast(editMode?"点击课表格子可调整课程":"已退出调整模式");
-}
-function editCell(d,p){
-  if(!editMode) return;
-  cellEdit={d,p};
-  const v=data.schedule[d][p]||"";
-  const [subj,cls]=v?v.split("|"):["",""];
-  document.getElementById("cellModalTitle").textContent=DAY_NAMES[d]+" · "+PERIODS[p].name;
-  document.getElementById("cellSubject").value=subj;
-  document.getElementById("cellClass").value=cls;
-  document.getElementById("cellModal").classList.add("show");
-}
-function closeCellModal(){ document.getElementById("cellModal").classList.remove("show"); }
-function saveCell(){
-  const subj=document.getElementById("cellSubject").value.trim();
-  const cls=document.getElementById("cellClass").value.trim();
-  data.schedule[cellEdit.d][cellEdit.p]= subj? (subj+"|"+(cls||"")) : "";
-  commit(); closeCellModal(); toast("已保存并同步");
-}
-function clearCell(){
-  data.schedule[cellEdit.d][cellEdit.p]="";
-  commit(); closeCellModal(); toast("已清空并同步");
-}
+  allBtn.addEventListener('click',function(){ selectedGroup=null; render(Store.getState()); });
 
-/* ---- 倒计时 ---- */
-function renderCountdown(){
-  const box=document.getElementById("countdownBox");
-  const now=new Date();
-  const todayIdx=(now.getDay()+6)%7;
-  if(todayIdx>=5){
-    box.innerHTML='<div class="empty-state"><div class="sprout">🌱</div><div class="txt">今天是周末，安心休息～</div></div>';
-    return;
-  }
-  const toMin=str=>{const [h,m]=str.split(":").map(Number);return h*60+m;};
-  const nowMin=now.getHours()*60+now.getMinutes();
-  let next=null;
-  PERIODS.forEach((p,pi)=>{
-    if(p.lunch||!p.t) return;
-    const end=toMin(p.t.split(" - ")[1]);
-    const v=data.schedule[todayIdx][pi];
-    if(nowMin<end && v && !next) next={p,pi,v};
+  Store.onState(function(s){ render(s); });
+  Store.onMode(function(m,on){
+    const el=document.getElementById('conn');
+    if(m==='local'){ el.className='conn local'; el.innerHTML='<span class="dot"></span>本机模式（需联网跨设备）'; }
+    else if(on){ el.className='conn'; el.innerHTML='<span class="dot"></span>实时已连接'; }
+    else { el.className='conn off'; el.innerHTML='<span class="dot"></span>连接中…'; }
   });
-  if(!next){
-    box.innerHTML='<div class="empty-state"><div class="sprout">🌱</div><div class="txt">今日课程已结束，辛苦了～</div></div>';
-    return;
-  }
-  const [subj,cls]=next.v.split("|");
-  const start=toMin(next.p.t.split(" - ")[0]);
-  const label= nowMin<start ? ("距离 "+next.p.name+" · "+subj+" 还有") : (next.p.name+" · "+subj+" 正在上");
-  const remain= nowMin<start ? (start-nowMin) : null;
-  box.innerHTML='<div class="countdown-box"><div class="cd-label">'+esc(label)+'</div>'+
-    '<div class="cd-main">'+(remain!==null? (remain>=60? Math.floor(remain/60)+" 小时 "+(remain%60)+" 分钟":remain+" 分钟") :esc(cls))+'</div>'+
-    '<div class="cd-sub">'+esc(cls)+" · "+next.p.t+'</div></div>';
-}
-setInterval(renderCountdown,30000);
-
-/* ---- 待办 ---- */
-function switchTodoTab(t){
-  todoTab=t;
-  document.getElementById("tabDoing").classList.toggle("active",t==="doing");
-  document.getElementById("tabDone").classList.toggle("active",t==="done");
-  renderTodos();
-}
-function renderTodos(){
-  const doing=data.todos.filter(t=>!t.done), done=data.todos.filter(t=>t.done);
-  document.getElementById("tabDoing").textContent="进行中 ("+doing.length+")";
-  document.getElementById("tabDone").textContent="已完成 ("+done.length+")";
-  const list=todoTab==="doing"?doing:done;
-  const box=document.getElementById("todoList");
-  if(!list.length){
-    box.innerHTML='<div class="empty-state"><div class="sprout">🌱</div><div class="txt">'+
-      (todoTab==="doing"?"暂无进行中的待办，点击右上角新增":"还没有已完成的待办")+'</div></div>';
-    return;
-  }
-  box.innerHTML=list.map(t=>
-    '<div class="todo-item'+(t.done?" finished":"")+'">'+
-    '<div class="todo-check'+(t.done?" done":"")+'" onclick="toggleTodo(\''+t.id+'\')">✓</div>'+
-    '<div class="todo-text">'+esc(t.text)+'</div>'+
-    '<div class="todo-del" onclick="delTodo(\''+t.id+'\')">✕</div></div>').join("");
-}
-function toggleTodo(id){
-  const t=data.todos.find(x=>x.id===id); if(!t) return;
-  t.done=!t.done; commit();
-}
-function delTodo(id){
-  data.todos=data.todos.filter(x=>x.id!==id); commit(); toast("已删除");
-}
-function openTodoModal(){
-  document.getElementById("todoInput").value="";
-  document.getElementById("todoModal").classList.add("show");
-  setTimeout(()=>document.getElementById("todoInput").focus(),50);
-}
-function closeTodoModal(){ document.getElementById("todoModal").classList.remove("show"); }
-function saveTodo(){
-  const v=document.getElementById("todoInput").value.trim();
-  if(!v) return;
-  data.todos.push({id:Date.now()+"_"+Math.random().toString(36).slice(2,7),text:v,done:false});
-  commit(); closeTodoModal(); toast("已添加并同步");
-}
-
-/* ---- 设置 ---- */
-function renderSettings(){
-  document.getElementById("syncCodeText").textContent=syncId||"未开启";
-  document.getElementById("nameInput").value=data.teacherName||"";
-  document.getElementById("userNameT").textContent=data.teacherName||"老师";
-  document.getElementById("avatarT").textContent=(data.teacherName||"老").replace("老师","").charAt(0);
-}
-
-/* ---- 工具 ---- */
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
-let toastTimer=null;
-function toast(msg){
-  const el=document.getElementById("toastEl");
-  el.textContent=msg; el.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>el.classList.remove("show"),2200);
-}
-document.querySelectorAll(".modal-mask").forEach(m=>
-  m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show");}));
-
-function renderAll(){ renderTimetable(); renderCountdown(); renderTodos(); renderSettings(); }
-
-/* ---- 启动 ---- */
-renderNav(); renderAll();
-initSync();
+  Store.init();
+})();
 </script>
-
-
-</body></html>
+</body>
+</html>
